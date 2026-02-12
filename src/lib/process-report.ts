@@ -1,8 +1,6 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { ReportStatus } from "@prisma/client";
 import OpenAI from "openai";
 import { toFile } from "openai/uploads";
-import { Readable } from "stream";
 import { z } from "zod";
 import { getPrisma } from "./prisma";
 
@@ -95,7 +93,9 @@ const normalizeExtracted = (payload: z.infer<typeof extractedSchema>) => ({
   safetyNotes: payload.safetyNotes ?? null,
 });
 
-const streamToBytes = async (stream: Readable): Promise<Uint8Array> => {
+const streamToBytes = async (
+  stream: AsyncIterable<Uint8Array | Buffer | string>,
+): Promise<Uint8Array> => {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -133,8 +133,9 @@ const getAudioBytesFromR2 = async (
     return result.Body.transformToByteArray();
   }
 
-  if (result.Body instanceof Readable) {
-    return streamToBytes(result.Body);
+  const bodyAsAsyncIterable = result.Body as AsyncIterable<Uint8Array | Buffer | string>;
+  if (typeof bodyAsAsyncIterable?.[Symbol.asyncIterator] === "function") {
+    return streamToBytes(bodyAsAsyncIterable);
   }
 
   throw new Error("Unsupported R2 response body type.");
@@ -228,7 +229,7 @@ export const processReport = async (
 
     await prisma.dailyReport.update({
       where: { id: reportId },
-      data: { status: ReportStatus.PROCESSING },
+      data: { status: "PROCESSING" },
     });
 
     let transcriptText = options.transcriptOverride?.trim() ?? "";
@@ -277,14 +278,14 @@ export const processReport = async (
         transcript_text: transcriptText,
         extracted_json: extractedJson,
         markdown_content: markdownContent,
-        status: ReportStatus.READY,
+        status: "READY",
       },
     });
   } catch (error) {
     try {
       await prisma.dailyReport.update({
         where: { id: reportId },
-        data: { status: ReportStatus.FAILED },
+        data: { status: "FAILED" },
       });
     } catch {
       // Intentionally swallow secondary failure when report is missing/unreachable.

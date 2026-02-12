@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { ReportStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "../../../lib/prisma";
@@ -74,7 +73,7 @@ export const POST = async (request: Request) => {
     const report = await prisma.dailyReport.create({
       data: {
         file_key: fileKey,
-        status: ReportStatus.UPLOADING,
+        status: "UPLOADING",
         project_id: randomUUID(),
         project_name: "Pending",
         superintendent_name: "Pending",

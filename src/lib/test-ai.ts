@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { ReportStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { processReport } from "./process-report";
 
@@ -23,13 +23,13 @@ const main = async () => {
   const testReport = await prisma.dailyReport.create({
     data: {
       file_key: `test/mock-${Date.now()}-${randomUUID()}.webm`,
-      status: ReportStatus.UPLOADING,
+      status: "UPLOADING",
       project_id: randomUUID(),
       project_name: "HammerVoice Test Project",
       superintendent_name: "Test Superintendent",
       report_date: new Date("2026-02-12T12:00:00.000Z"),
       transcript_text: "",
-      extracted_json: null,
+      extracted_json: Prisma.JsonNull,
       markdown_content: "",
     },
     select: { id: true },
@@ -53,7 +53,7 @@ const main = async () => {
   });
 
   assertOrThrow(Boolean(updated), "Updated report not found.");
-  assertOrThrow(updated!.status === ReportStatus.READY, "Expected report status READY.");
+  assertOrThrow(updated!.status === "READY", "Expected report status READY.");
 
   const extracted = (updated!.extracted_json ?? {}) as {
     workPerformed?: Array<{
