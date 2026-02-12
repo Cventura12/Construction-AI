@@ -1,0 +1,11 @@
+
+> construction-site@1.0.0 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.200.101.66:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 2.3s
