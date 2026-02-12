@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "postinstall": "prisma generate",
+    "prebuild": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
