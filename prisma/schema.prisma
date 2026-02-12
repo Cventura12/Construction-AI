@@ -1,0 +1,84 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  // Prisma v7 reads datasource URLs from prisma.config.ts.
+  provider = "postgresql"
+}
+
+enum ReportStatus {
+  UPLOADING
+  DRAFT
+  PROCESSING
+  READY
+  FAILED
+}
+
+model DailyReport {
+  id                  String       @id @default(uuid())
+  file_key            String       @unique
+  project_id          String
+  project_name        String
+  superintendent_name String
+  report_date         DateTime
+  status              ReportStatus @default(DRAFT)
+  transcript_text     String       @db.Text
+  extracted_json      Json?
+  markdown_content    String       @db.Text
+  work_entries        WorkEntry[]
+  deliveries          Delivery[]
+  delays              Delay[]
+  created_at          DateTime     @default(now())
+  updated_at          DateTime     @updatedAt
+
+  @@index([project_id])
+  @@index([report_date])
+  @@index([file_key])
+  @@index([status])
+}
+
+model WorkEntry {
+  id              String      @id @default(uuid())
+  daily_report_id String
+  trade           String
+  description     String      @db.Text
+  location        String?
+  crew_count      Int?
+  hours_worked    Float?
+  daily_report    DailyReport @relation(fields: [daily_report_id], references: [id], onDelete: Cascade)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  @@index([daily_report_id])
+}
+
+model Delivery {
+  id              String      @id @default(uuid())
+  daily_report_id String
+  vendor          String
+  material        String
+  quantity        Float?
+  unit            String?
+  delivered_at    DateTime?
+  daily_report    DailyReport @relation(fields: [daily_report_id], references: [id], onDelete: Cascade)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  @@index([daily_report_id])
+}
+
+model Delay {
+  id                 String      @id @default(uuid())
+  daily_report_id    String
+  reason             String
+  impact_description String      @db.Text
+  minutes_lost       Int?
+  resolved           Boolean     @default(false)
+  daily_report       DailyReport @relation(fields: [daily_report_id], references: [id], onDelete: Cascade)
+  created_at         DateTime    @default(now())
+  updated_at         DateTime    @updatedAt
+
+  @@index([daily_report_id])
+}
