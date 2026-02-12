@@ -76,7 +76,6 @@ const uploadAudio = async (audioBlob: Blob): Promise<string> => {
 const triggerReportProcessing = (reportId: string): void => {
   const payload = JSON.stringify({ reportId });
 
-  // Fire-and-forget so we can move the user to review immediately.
   void fetch("/api/reports/process", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -233,23 +232,24 @@ const Recorder = () => {
   }, [resetSession]);
 
   return (
-    <section className="flex min-h-screen flex-col items-center justify-center bg-hammer-concrete p-8">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
       <div className="mb-8 text-center">
         <h1 className="text-4xl font-black uppercase tracking-tight text-hammer-navy">
           HammerVoice
         </h1>
-        <p className="font-medium text-slate-500">Chattanooga Site A • Daily Log</p>
+        <p className="font-medium text-slate-500">Chattanooga Site A - Daily Log</p>
       </div>
 
       <button
         type="button"
         onClick={handleMainButtonClick}
         disabled={status === "uploading"}
-        className={`relative flex h-48 w-48 flex-col items-center justify-center rounded-full text-white shadow-xl transition-all duration-300 ${
+        className={`relative h-48 w-48 rounded-full bg-orange-500 text-white font-bold flex items-center justify-center shadow-2xl transition-all duration-300 ${
           isRecording
             ? "scale-110 bg-red-600 shadow-red-200"
-            : "bg-hammer-orange hover:bg-orange-600 active:scale-95"
+            : "hover:bg-orange-600 active:scale-95"
         } disabled:cursor-not-allowed disabled:opacity-80`}
+        style={{ width: "200px", height: "200px" }}
       >
         {isRecording ? (
           <span className="absolute inset-0 rounded-full bg-red-600 opacity-25 animate-ping" />
@@ -281,7 +281,7 @@ const Recorder = () => {
               {status === "uploading"
                 ? "Loading AI..."
                 : isRecording
-                  ? `Recording • ${formatTimer(elapsedSeconds)}`
+                  ? `Recording - ${formatTimer(elapsedSeconds)}`
                   : "Ready to record"}
             </p>
           </div>
@@ -293,7 +293,7 @@ const Recorder = () => {
           </p>
         ) : null}
       </div>
-    </section>
+    </div>
   );
 };
 

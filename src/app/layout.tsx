@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "@/app/globals.css";
 
 export const metadata: Metadata = {
   title: "HammerVoice",
@@ -13,10 +13,9 @@ type RootLayoutProps = Readonly<{
 const RootLayout = ({ children }: RootLayoutProps) => {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="bg-slate-50 min-h-screen">{children}</body>
     </html>
   );
 };
 
 export default RootLayout;
-
