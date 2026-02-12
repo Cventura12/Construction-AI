@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ClipboardList, FileDown, HardHat, Share2 } from "lucide-react";
 
 type WorkPerformedRow = {
   subcontractor: string;
@@ -34,31 +35,18 @@ type ReviewClientProps = {
     reportDateISO: string;
     reportDateLabel: string;
     transcriptText: string;
+    markdownContent: string;
     extracted: ExtractedData;
   };
 };
 
-const newWorkPerformedRow = (): WorkPerformedRow => ({
-  subcontractor: "",
-  task: "",
-  crewSize: "",
-});
-
-const newDeliveryRow = (): DeliveryRow => ({
-  material: "",
-  status: "",
-});
-
-const newDelayRow = (): DelayRow => ({
-  reason: "",
-  duration: "",
-});
-
 export const ReviewClient = ({ initialReport }: ReviewClientProps) => {
   const router = useRouter();
   const [formData, setFormData] = useState<ExtractedData>(initialReport.extracted);
+  const [markdownContent, setMarkdownContent] = useState(initialReport.markdownContent || "");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   const isProcessing = useMemo(
     () => initialReport.status !== "READY" && initialReport.status !== "FAILED",
@@ -78,56 +66,43 @@ export const ReviewClient = ({ initialReport }: ReviewClientProps) => {
 
   useEffect(() => {
     setFormData(initialReport.extracted);
+    setMarkdownContent(initialReport.markdownContent || "");
   }, [initialReport.extracted, initialReport.id, initialReport.status]);
 
-  const updateWorkPerformed = (
-    index: number,
-    field: keyof WorkPerformedRow,
-    value: string,
-  ) => {
-    setFormData((prev) => {
-      const next = [...prev.workPerformed];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, workPerformed: next };
-    });
+  const statusClasses: Record<ReviewClientProps["initialReport"]["status"], string> = {
+    PROCESSING: "border-amber-300 bg-amber-100 text-amber-900",
+    READY: "border-emerald-300 bg-emerald-100 text-emerald-900",
+    FAILED: "border-red-300 bg-red-100 text-red-900",
+    DRAFT: "border-slate-300 bg-slate-100 text-slate-800",
+    UPLOADING: "border-amber-300 bg-amber-100 text-amber-900",
   };
 
-  const updateDelivery = (index: number, field: keyof DeliveryRow, value: string) => {
-    setFormData((prev) => {
-      const next = [...prev.deliveries];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, deliveries: next };
-    });
-  };
+  const dateLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      }).format(new Date()),
+    [],
+  );
 
-  const updateDelay = (index: number, field: keyof DelayRow, value: string) => {
-    setFormData((prev) => {
-      const next = [...prev.delays];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, delays: next };
-    });
-  };
-
-  const addWorkPerformed = () =>
-    setFormData((prev) => ({
-      ...prev,
-      workPerformed: [...prev.workPerformed, newWorkPerformedRow()],
-    }));
-
-  const addDelivery = () =>
-    setFormData((prev) => ({
-      ...prev,
-      deliveries: [...prev.deliveries, newDeliveryRow()],
-    }));
-
-  const addDelay = () =>
-    setFormData((prev) => ({
-      ...prev,
-      delays: [...prev.delays, newDelayRow()],
-    }));
+  const manpowerRows = useMemo(
+    () =>
+      formData.workPerformed
+        .map((entry) => ({
+          trade: entry.subcontractor || entry.task || "",
+          count: entry.crewSize || "",
+          hours: "",
+          notes: entry.task || "",
+        }))
+        .filter((row) => row.trade || row.count || row.notes),
+    [formData.workPerformed],
+  );
 
   const exportPdf = async () => {
     setError(null);
+    setShareMessage(null);
     setIsGenerating(true);
 
     try {
@@ -139,6 +114,7 @@ export const ReviewClient = ({ initialReport }: ReviewClientProps) => {
           projectName: initialReport.projectName,
           reportDate: initialReport.reportDateISO,
           transcriptText: initialReport.transcriptText,
+          markdownContent,
           extractedJson: formData,
         }),
       });
@@ -166,181 +142,155 @@ export const ReviewClient = ({ initialReport }: ReviewClientProps) => {
     }
   };
 
-  if (initialReport.status === "FAILED") {
-    return (
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-red-300 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-black text-red-800">Processing Failed</h1>
-        <p className="mt-2 text-sm font-medium text-red-700">
-          The AI pipeline could not process this audio. Please record again or contact support.
-        </p>
-      </section>
-    );
-  }
+  const shareLink = async () => {
+    setError(null);
+    setShareMessage(null);
 
-  if (isProcessing) {
-    return (
-      <section className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center rounded-2xl border border-zinc-300 bg-white p-6 shadow-sm">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
-        <h1 className="mt-4 text-2xl font-black text-zinc-900">Processing Report...</h1>
-        <p className="mt-2 text-sm font-semibold text-zinc-600">
-          We are transcribing and structuring your field notes now.
-        </p>
-      </section>
-    );
-  }
+    try {
+      const url = window.location.href;
+      if (navigator.share) {
+        await navigator.share({
+          title: "Daily Construction Report",
+          text: `Report ${initialReport.id}`,
+          url,
+        });
+        setShareMessage("Link shared.");
+        return;
+      }
+
+      await navigator.clipboard.writeText(url);
+      setShareMessage("Link copied to clipboard.");
+    } catch {
+      setError("Could not share link. Try again.");
+    }
+  };
 
   return (
-    <section className="mx-auto w-full max-w-7xl rounded-2xl border border-zinc-300 bg-white p-4 shadow-sm sm:p-6">
-      <header className="border-b border-zinc-300 pb-4">
-        <h1 className="text-2xl font-black tracking-tight text-zinc-900">DAILY CONSTRUCTION REPORT</h1>
-        <div className="mt-3 flex flex-col gap-1 text-sm font-semibold text-zinc-700 sm:flex-row sm:gap-6">
-          <p>Project: {initialReport.projectName}</p>
-          <p>Date: {initialReport.reportDateLabel}</p>
-          <p>Report ID: {initialReport.id}</p>
+    <section className="mx-auto w-full max-w-3xl pb-28">
+      <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">
+            Daily Construction Report
+          </h1>
+          <span
+            className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-extrabold uppercase ${statusClasses[initialReport.status]}`}
+          >
+            {initialReport.status}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-2 text-sm font-semibold text-slate-700 sm:grid-cols-2">
+          <p className="flex items-center gap-2">
+            <HardHat className="h-4 w-4 text-hammer-orange" />
+            Project: {initialReport.projectName || "Chattanooga Site A"}
+          </p>
+          <p className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-hammer-orange" />
+            Date: {dateLabel}
+          </p>
         </div>
       </header>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <section className="rounded-xl border border-zinc-300 bg-zinc-50 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-black text-zinc-900">Work Performed</h2>
-              <button
-                type="button"
-                onClick={addWorkPerformed}
-                className="rounded-md border border-zinc-900 bg-white px-3 py-1 text-xs font-bold uppercase text-zinc-900"
-              >
-                Add Row
-              </button>
-            </div>
-            <div className="space-y-3">
-              {formData.workPerformed.map((row, index) => (
-                <div key={`work-${index}`} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <input
-                    value={row.subcontractor}
-                    onChange={(e) => updateWorkPerformed(index, "subcontractor", e.target.value)}
-                    placeholder="Subcontractor"
-                    className="rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-                  />
-                  <input
-                    value={row.task}
-                    onChange={(e) => updateWorkPerformed(index, "task", e.target.value)}
-                    placeholder="Task"
-                    className="rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-                  />
-                  <input
-                    value={row.crewSize}
-                    onChange={(e) => updateWorkPerformed(index, "crewSize", e.target.value)}
-                    placeholder="Crew Size"
-                    className="rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
+      {isProcessing ? (
+        <section className="mt-4 rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-700" />
+          <h2 className="mt-4 text-xl font-black uppercase text-slate-900">Processing...</h2>
+          <p className="mt-1 text-sm font-medium text-slate-600">
+            AI is transcribing and structuring your report.
+          </p>
+        </section>
+      ) : null}
 
-          <section className="rounded-xl border border-zinc-300 bg-zinc-50 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-black text-zinc-900">Deliveries</h2>
-              <button
-                type="button"
-                onClick={addDelivery}
-                className="rounded-md border border-zinc-900 bg-white px-3 py-1 text-xs font-bold uppercase text-zinc-900"
-              >
-                Add Row
-              </button>
-            </div>
-            <div className="space-y-3">
-              {formData.deliveries.map((row, index) => (
-                <div key={`delivery-${index}`} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <input
-                    value={row.material}
-                    onChange={(e) => updateDelivery(index, "material", e.target.value)}
-                    placeholder="Material"
-                    className="rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-                  />
-                  <input
-                    value={row.status}
-                    onChange={(e) => updateDelivery(index, "status", e.target.value)}
-                    placeholder="Status"
-                    className="rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
+      {initialReport.status === "FAILED" ? (
+        <section className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-800">
+            Processing failed. Please re-record or retry processing.
+          </p>
+        </section>
+      ) : null}
 
-          <section className="rounded-xl border border-zinc-300 bg-zinc-50 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-black text-zinc-900">Delays</h2>
-              <button
-                type="button"
-                onClick={addDelay}
-                className="rounded-md border border-zinc-900 bg-white px-3 py-1 text-xs font-bold uppercase text-zinc-900"
-              >
-                Add Row
-              </button>
-            </div>
-            <div className="space-y-3">
-              {formData.delays.map((row, index) => (
-                <div key={`delay-${index}`} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <input
-                    value={row.reason}
-                    onChange={(e) => updateDelay(index, "reason", e.target.value)}
-                    placeholder="Reason"
-                    className="rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-                  />
-                  <input
-                    value={row.duration}
-                    onChange={(e) => updateDelay(index, "duration", e.target.value)}
-                    placeholder="Duration"
-                    className="rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-zinc-300 bg-zinc-50 p-4">
-            <h2 className="text-lg font-black text-zinc-900">Safety Notes</h2>
+      {!isProcessing ? (
+        <div className="mt-4 space-y-4">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-black uppercase tracking-wide text-slate-900">
+              Markdown Review
+            </h2>
             <textarea
-              value={formData.safetyNotes}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  safetyNotes: e.target.value,
-                }))
-              }
-              placeholder="Safety observations, incidents, PPE compliance, etc."
-              rows={5}
-              className="mt-3 w-full rounded-md border border-zinc-400 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
+              value={markdownContent}
+              onChange={(e) => setMarkdownContent(e.target.value)}
+              rows={14}
+              className="mt-3 w-full rounded-lg border border-slate-300 bg-white p-3 font-sans text-sm leading-relaxed text-slate-800"
+              placeholder="Edit the report markdown here..."
             />
           </section>
-        </div>
 
-        <aside className="rounded-xl border border-zinc-300 bg-zinc-50 p-4">
-          <h2 className="text-lg font-black text-zinc-900">Transcript</h2>
-          <p className="mt-3 max-h-[24rem] overflow-y-auto whitespace-pre-wrap rounded-md border border-zinc-300 bg-white p-3 text-sm leading-relaxed text-zinc-700">
-            {initialReport.transcriptText || "No transcript available."}
-          </p>
-        </aside>
-      </div>
+          {manpowerRows.length > 0 ? (
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-black uppercase tracking-wide text-slate-900">
+                Manpower Summary
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-800">
+                  <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-700">
+                    <tr>
+                      <th className="px-4 py-3">Trade</th>
+                      <th className="px-4 py-3">Count</th>
+                      <th className="px-4 py-3">Hours</th>
+                      <th className="px-4 py-3">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {manpowerRows.map((row, index) => (
+                      <tr
+                        key={`${row.trade}-${index}`}
+                        className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}
+                      >
+                        <td className="px-4 py-3 font-semibold">{row.trade || "-"}</td>
+                        <td className="px-4 py-3">{row.count || "-"}</td>
+                        <td className="px-4 py-3">{row.hours || "-"}</td>
+                        <td className="px-4 py-3">{row.notes || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
-        <p className="mt-5 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
+        <p className="mt-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-6">
+      {shareMessage ? (
+        <p className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+          {shareMessage}
+        </p>
+      ) : null}
+
+      <div className="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={exportPdf}
+            disabled={isGenerating || isProcessing || initialReport.status === "FAILED"}
+            className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-hammer-orange px-4 py-3 text-base font-black text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <FileDown className="h-4 w-4" />
+            {isGenerating ? "Generating PDF..." : "Generate & Export PDF"}
+          </button>
         <button
           type="button"
-          onClick={exportPdf}
-          disabled={isGenerating}
-          className="min-h-16 w-full rounded-xl border-2 border-black bg-emerald-600 px-4 py-3 text-lg font-black text-white shadow-[0_5px_0_#000] transition active:translate-y-[2px] active:shadow-[0_3px_0_#000] disabled:cursor-not-allowed disabled:bg-emerald-300"
+            onClick={shareLink}
+            disabled={isGenerating}
+            className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-base font-black text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isGenerating ? "Generating PDF..." : "Export PDF"}
+            <Share2 className="h-4 w-4" />
+            Share Link
         </button>
+        </div>
       </div>
     </section>
   );

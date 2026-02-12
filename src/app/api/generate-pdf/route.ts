@@ -8,6 +8,7 @@ const payloadSchema = z.object({
   projectName: z.string().min(1),
   reportDate: z.string().min(1),
   transcriptText: z.string().optional().default(""),
+  markdownContent: z.string().optional().default(""),
   extractedJson: z.object({
     workPerformed: z
       .array(
@@ -279,7 +280,10 @@ export const POST = async (request: Request) => {
       );
     }
 
-    const markdown = buildMarkdown(parsed.data);
+    const markdown =
+      parsed.data.markdownContent.trim().length > 0
+        ? parsed.data.markdownContent
+        : buildMarkdown(parsed.data);
     const html = buildHtml(parsed.data, markdown);
 
     const puppeteer = await import("puppeteer-core");

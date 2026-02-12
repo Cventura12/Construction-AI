@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 * {
   box-sizing: border-box;
 }
@@ -6,12 +10,11 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #e4e4e7;
-  color: #111827;
+  background: #f8fafc;
+  color: #0f172a;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 a {
   color: inherit;
 }
-

@@ -78,6 +78,7 @@ const ReportReviewPage = async ({ params }: PageProps) => {
       report_date: true,
       extracted_json: true,
       transcript_text: true,
+      markdown_content: true,
     },
   });
 
@@ -96,10 +97,11 @@ const ReportReviewPage = async ({ params }: PageProps) => {
         initialReport={{
           id: report.id,
           status: report.status,
-          projectName: report.project_name,
+          projectName: report.project_name?.trim() || "Chattanooga Site A",
           reportDateISO: report.report_date.toISOString(),
           reportDateLabel: formatDateForDisplay(report.report_date),
           transcriptText: report.transcript_text ?? "",
+          markdownContent: report.markdown_content ?? "",
           extracted: normalizedExtracted,
         }}
       />
